@@ -1,5 +1,5 @@
-import { convertPriceToCents } from "../../../utils/order";
-import { cn } from "../../../utils/classNames";
+import { convertPriceToCents } from "@/utils/order";
+import { cn } from "@/utils/classNames";
 
 interface OutcomeButtonsProps {
   outcomes: string[];

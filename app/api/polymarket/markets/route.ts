@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
 
       if (market.acceptingOrders === false) return false;
       if (!market.clobTokenIds) return false;
+      if (market.enableOrderBook === false) return false;
       if (market.outcomePrices) {
         try {
           const prices = JSON.parse(market.outcomePrices);
@@ -77,8 +78,9 @@ export async function GET(request: NextRequest) {
       );
 
       const liquidity = parseFloat(market.liquidity || "0");
-      if (!hasEvergreenTag && liquidity < 5000) return false;
-      if (liquidity < 1000) return false;
+      const volume24hr = parseFloat(market.volume24hr || "0");
+      if ((!hasEvergreenTag && liquidity < 1000) || volume24hr < 100)
+        return false;
 
       return true;
     });

@@ -1,5 +1,5 @@
-import { formatCurrency, formatShares } from "../../../utils/formatting";
-import { calculateTotalCost } from "../../../utils/order";
+import { formatCurrency, formatShares } from "@/utils/formatting";
+import { calculateTotalCost } from "@/utils/order";
 
 interface OrderSummaryProps {
   size: number;

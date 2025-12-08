@@ -7,7 +7,7 @@ import {
   FACTORY,
   IMPLEMENTATION,
   PROXY_BYTECODE_TEMPLATE,
-} from "../constants/proxyWallet";
+} from "@/constants/proxyWallet";
 
 /*
   This hook derives the proxy wallet from the wallet address of the user
@@ -18,11 +18,11 @@ import {
   address and assumes the proxy wallet has been deployed.
 */
 
-export default function useProxyWallet(eoaAddress: string | undefined) {
-  const { publicClient } = useWallet();
+export default function useProxyWallet() {
+  const { publicClient, eoaAddress } = useWallet();
 
   const proxyAddress = useMemo(() => {
-    if (!eoaAddress) return null;
+    if (!eoaAddress || !publicClient) return null;
 
     try {
       const proxyBytecode = PROXY_BYTECODE_TEMPLATE.replace(

@@ -1,16 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import type { PolymarketOrder } from "../../../hooks/useActiveOrders";
+import type { PolymarketOrder } from "@/hooks/useActiveOrders";
 
-import Card from "../../shared/Card";
-import Badge from "../../shared/Badge";
-import StatDisplay from "../../shared/StatDisplay";
+import Card from "@/components/shared/Card";
+import Badge from "@/components/shared/Badge";
+import StatDisplay from "@/components/shared/StatDisplay";
 
-import { QUERY_STALE_TIMES } from "../../../constants/query";
-import {
-  formatPrice,
-  formatCurrency,
-  formatShares,
-} from "../../../utils/formatting";
+import { QUERY_STALE_TIMES } from "@/constants/query";
+import { formatPrice, formatCurrency, formatShares } from "@/utils/formatting";
 
 interface OrderCardProps {
   order: PolymarketOrder;

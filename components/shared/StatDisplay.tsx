@@ -1,4 +1,4 @@
-import { cn } from "../../utils/classNames";
+import { cn } from "@/utils/classNames";
 
 interface StatDisplayProps {
   label: string;

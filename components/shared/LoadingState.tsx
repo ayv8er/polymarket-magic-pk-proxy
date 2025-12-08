@@ -1,4 +1,4 @@
-import { LOADING_STYLES } from "../../constants/ui";
+import { LOADING_STYLES } from "@/constants/ui";
 
 interface LoadingStateProps {
   message?: string;

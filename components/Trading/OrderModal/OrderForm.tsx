@@ -1,7 +1,4 @@
-import {
-  isValidDecimalInput,
-  isValidCentsInput,
-} from "../../../utils/validation";
+import { isValidDecimalInput, isValidCentsInput } from "@/utils/validation";
 
 interface OrderFormProps {
   size: string;

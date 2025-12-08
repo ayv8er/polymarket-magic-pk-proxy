@@ -2,26 +2,23 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import useClobOrder from "../../../hooks/useClobOrder";
-import useTradingClient from "../../../hooks/useTradingClient";
-import useRedeemPosition from "../../../hooks/useRedeemPosition";
-import useUserPositions, {
-  PolymarketPosition,
-} from "../../../hooks/useUserPositions";
+import { useTrading } from "@/providers";
+import useClobOrder from "@/hooks/useClobOrder";
+import useRedeemPosition from "@/hooks/useRedeemPosition";
+import useUserPositions, { PolymarketPosition } from "@/hooks/useUserPositions";
 
-import ErrorState from "../../shared/ErrorState";
-import EmptyState from "../../shared/EmptyState";
-import LoadingState from "../../shared/LoadingState";
-import PositionCard from "./PositionCard";
-import PositionFilters from "./PositionFilters";
+import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
+import LoadingState from "@/components/shared/LoadingState";
+import PositionCard from "@/components/Trading/Positions/PositionCard";
+import PositionFilters from "@/components/Trading/Positions/PositionFilters";
 
-import { createPollingInterval } from "../../../utils/polling";
-import { DUST_THRESHOLD } from "../../../constants/validation";
-import { POLLING_DURATION, POLLING_INTERVAL } from "../../../constants/query";
+import { createPollingInterval } from "@/utils/polling";
+import { DUST_THRESHOLD } from "@/constants/validation";
+import { POLLING_DURATION, POLLING_INTERVAL } from "@/constants/query";
 
 export default function UserPositions() {
-  const { clobClient, eoaAddress, proxyAddress, relayClient } =
-    useTradingClient();
+  const { clobClient, eoaAddress, proxyAddress, relayClient } = useTrading();
 
   const {
     data: positions,

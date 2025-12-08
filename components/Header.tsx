@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import useAddressCopy from "../hooks/useAddressCopy";
-import useProxyWallet from "../hooks/useProxyWallet";
-import { useWallet } from "../providers/WalletProvider";
-import { POLYMARKET_PROFILE_URL } from "../constants/polymarket";
+import useAddressCopy from "@/hooks/useAddressCopy";
+import useProxyWallet from "@/hooks/useProxyWallet";
+import { useWallet } from "@/providers/WalletProvider";
+import { POLYMARKET_PROFILE_URL } from "@/constants/polymarket";
 
 interface HeaderProps {
   isConnected: boolean;
@@ -23,7 +23,7 @@ export default function Header({
     proxyAddress ?? null
   );
 
-  const { isProxyDeployed } = useProxyWallet(eoaAddress);
+  const { isProxyDeployed } = useProxyWallet();
   const [proxyIsDeployed, setProxyIsDeployed] = useState(false);
 
   useEffect(() => {

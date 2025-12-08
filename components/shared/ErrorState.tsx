@@ -1,4 +1,4 @@
-import { ERROR_STYLES } from "../../constants/ui";
+import { ERROR_STYLES } from "@/constants/ui";
 
 interface ErrorStateProps {
   error: Error | string | unknown;

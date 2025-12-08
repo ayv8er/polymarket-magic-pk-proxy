@@ -1,11 +1,11 @@
-import type { PolymarketMarket } from "../../../hooks/useHighVolumeMarkets";
+import type { PolymarketMarket } from "@/hooks/useHighVolumeMarkets";
 
-import Card from "../../shared/Card";
-import Badge from "../../shared/Badge";
-import StatDisplay from "../../shared/StatDisplay";
-import OutcomeButtons from "../../Trading/Markets/OutcomeButtons";
+import Card from "@/components/shared/Card";
+import Badge from "@/components/shared/Badge";
+import StatDisplay from "@/components/shared/StatDisplay";
+import OutcomeButtons from "@/components/Trading/Markets/OutcomeButtons";
 
-import { formatVolume, formatLiquidity } from "../../../utils/formatting";
+import { formatVolume, formatLiquidity } from "@/utils/formatting";
 
 interface MarketCardProps {
   market: PolymarketMarket;

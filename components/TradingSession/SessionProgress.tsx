@@ -1,4 +1,4 @@
-import { SessionStep } from "../../utils/session";
+import { SessionStep } from "@/utils/session";
 
 export default function SessionProgress({
   currentStep,

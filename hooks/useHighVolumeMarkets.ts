@@ -1,5 +1,5 @@
+import { useTrading } from "@/providers";
 import { useQuery } from "@tanstack/react-query";
-import useTradingClient from "./useTradingClient";
 import { Side } from "@polymarket/clob-client";
 
 export type PolymarketMarket = {
@@ -23,17 +23,20 @@ export type PolymarketMarket = {
   endDateIso?: string;
   gameStartTime?: string;
   events?: any[];
-  realtimePrices?: Record<string, {
-    bidPrice: number;
-    askPrice: number;
-    midPrice: number;
-    spread: number;
-  }>;
+  realtimePrices?: Record<
+    string,
+    {
+      bidPrice: number;
+      askPrice: number;
+      midPrice: number;
+      spread: number;
+    }
+  >;
   [key: string]: any;
 };
 
 export default function useHighVolumeMarkets(limit: number = 10) {
-  const { clobClient } = useTradingClient();
+  const { clobClient } = useTrading();
 
   return useQuery({
     queryKey: ["high-volume-markets", limit, !!clobClient],
@@ -83,14 +86,20 @@ export default function useHighVolumeMarkets(limit: number = 10) {
                       };
                     }
                   } catch (error) {
-                    console.warn(`Error fetching price for token ${tokenId}:`, error);
+                    console.warn(
+                      `Error fetching price for token ${tokenId}:`,
+                      error
+                    );
                   }
                 })
               );
 
               market.realtimePrices = priceMap;
             } catch (error) {
-              console.warn(`Failed to fetch prices for market ${market.id}:`, error);
+              console.warn(
+                `Failed to fetch prices for market ${market.id}:`,
+                error
+              );
             }
           })
         );

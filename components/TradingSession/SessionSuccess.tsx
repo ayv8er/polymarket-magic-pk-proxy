@@ -1,4 +1,4 @@
-import type { TradingSession } from "../../utils/session";
+import type { TradingSession } from "@/utils/session";
 
 export default function SessionSuccess({
   session,
@@ -11,10 +11,6 @@ export default function SessionSuccess({
         <ul className="space-y-1 ml-4 list-disc">
           <li>Magic proxy wallet deployed at: {session.proxyAddress}</li>
           <li>CLOB client initialized with user's API credentials</li>
-          <li>
-            Trades may still fail if the user has never placed a trade on
-            Polymarket.com before.
-          </li>
         </ul>
       </div>
     </div>

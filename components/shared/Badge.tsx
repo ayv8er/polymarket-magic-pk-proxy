@@ -1,4 +1,4 @@
-import { cn } from "../../utils/classNames";
+import { cn } from "@/utils/classNames";
 
 type BadgeVariant = "buy" | "sell" | "closed" | "default";
 

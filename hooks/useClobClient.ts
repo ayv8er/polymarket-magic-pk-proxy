@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { TradingSession } from "../utils/session";
+import { TradingSession } from "@/utils/session";
 import { ClobClient } from "@polymarket/clob-client";
 import { BuilderConfig } from "@polymarket/builder-signing-sdk";
 
@@ -7,7 +7,7 @@ import {
   CLOB_API_URL,
   POLYGON_CHAIN_ID,
   REMOTE_SIGNING_URL,
-} from "../constants/polymarket";
+} from "@/constants/polymarket";
 import type { Wallet } from "ethers";
 
 // This hook creates the authenticated clobClient with the User API Credentials

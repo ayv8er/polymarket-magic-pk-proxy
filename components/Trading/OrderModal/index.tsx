@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import useClobOrder from "../../../hooks/useClobOrder";
+import useClobOrder from "@/hooks/useClobOrder";
 
-import Portal from "../../Portal";
-import OrderForm from "../../Trading/OrderModal/OrderForm";
-import OrderSummary from "../../Trading/OrderModal/OrderSummary";
-import OrderTypeToggle from "../../Trading/OrderModal/OrderTypeToggle";
+import Portal from "@/components/Portal";
+import OrderForm from "@/components/Trading/OrderModal/OrderForm";
+import OrderSummary from "@/components/Trading/OrderModal/OrderSummary";
+import OrderTypeToggle from "@/components/Trading/OrderModal/OrderTypeToggle";
 
-import { cn } from "../../../utils/classNames";
-import { SUCCESS_STYLES } from "../../../constants/ui";
-import { convertCentsToPrice } from "../../../utils/order";
-import { MIN_ORDER_SIZE } from "../../../constants/validation";
-import { isValidSize, isValidPriceCents } from "../../../utils/validation";
+import { cn } from "@/utils/classNames";
+import { SUCCESS_STYLES } from "@/constants/ui";
+import { convertCentsToPrice } from "@/utils/order";
+import { MIN_ORDER_SIZE } from "@/constants/validation";
+import { isValidSize, isValidPriceCents } from "@/utils/validation";
 
 import type { ClobClient } from "@polymarket/clob-client";
 

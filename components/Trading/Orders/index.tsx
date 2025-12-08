@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import useClobOrder from "../../../hooks/useClobOrder";
-import useActiveOrders from "../../../hooks/useActiveOrders";
-import useTradingClient from "../../../hooks/useTradingClient";
+import { useTrading } from "@/providers";
+import useClobOrder from "@/hooks/useClobOrder";
+import useActiveOrders from "@/hooks/useActiveOrders";
 
-import ErrorState from "../../shared/ErrorState";
-import EmptyState from "../../shared/EmptyState";
-import LoadingState from "../../shared/LoadingState";
-import OrderCard from "./OrderCard";
+import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
+import LoadingState from "@/components/shared/LoadingState";
+import OrderCard from "@/components/Trading/Orders/OrderCard";
 
 export default function ActiveOrders() {
-  const { clobClient, proxyAddress } = useTradingClient();
+  const { clobClient, proxyAddress } = useTrading();
   const {
     data: orders,
     isLoading,

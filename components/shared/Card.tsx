@@ -1,5 +1,5 @@
-import { cn } from "../../utils/classNames";
-import { CARD_STYLES } from "../../constants/ui";
+import { cn } from "@/utils/classNames";
+import { CARD_STYLES } from "@/constants/ui";
 
 interface CardProps {
   children: React.ReactNode;

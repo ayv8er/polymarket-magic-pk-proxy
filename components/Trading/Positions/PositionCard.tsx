@@ -1,14 +1,14 @@
-import type { PolymarketPosition } from "../../../hooks/useUserPositions";
+import type { PolymarketPosition } from "@/hooks/useUserPositions";
 
-import Card from "../../shared/Card";
-import StatDisplay from "../../shared/StatDisplay";
+import Card from "@/components/shared/Card";
+import StatDisplay from "@/components/shared/StatDisplay";
 
 import {
   formatCurrency,
   formatShares,
   formatPercentage,
-} from "../../../utils/formatting";
-import { cn } from "../../../utils/classNames";
+} from "@/utils/formatting";
+import { cn } from "@/utils/classNames";
 
 interface PositionCardProps {
   position: PolymarketPosition;

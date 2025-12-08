@@ -11,7 +11,7 @@ import {
   clearSession,
   TradingSession,
   SessionStep,
-} from "../utils/session";
+} from "@/utils/session";
 
 // This is the coordination hook that manages the user's trading session
 // It orchestrates the steps for initializing the CLOB client
@@ -25,7 +25,7 @@ export default function useTradingSession() {
   );
 
   const { wallet, eoaAddress } = useWallet();
-  const { proxyAddress } = useProxyWallet(eoaAddress);
+  const { proxyAddress } = useProxyWallet();
   const { createOrDeriveUserApiCredentials } = useUserApiCredentials();
   const { checkAllTokenApprovals, setAllTokenApprovals } = useTokenApprovals();
   const { relayClient, initializeRelayClient, clearRelayClient } =

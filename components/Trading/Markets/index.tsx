@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import useTradingClient from "../../../hooks/useTradingClient";
-import useHighVolumeMarkets from "../../../hooks/useHighVolumeMarkets";
+import { useTrading } from "@/providers";
+import useHighVolumeMarkets from "@/hooks/useHighVolumeMarkets";
 
-import ErrorState from "../../shared/ErrorState";
-import EmptyState from "../../shared/EmptyState";
-import LoadingState from "../../shared/LoadingState";
-import MarketCard from "../../Trading/Markets/MarketCard";
-import OrderPlacementModal from "../../Trading/OrderModal";
+import ErrorState from "@/components/shared/ErrorState";
+import EmptyState from "@/components/shared/EmptyState";
+import LoadingState from "@/components/shared/LoadingState";
+import MarketCard from "@/components/Trading/Markets/MarketCard";
+import OrderPlacementModal from "@/components/Trading/OrderModal";
 
 export default function HighVolumeMarkets() {
-  const { clobClient, eoaAddress } = useTradingClient();
+  const { clobClient, eoaAddress } = useTrading();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<{
     marketTitle: string;

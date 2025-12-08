@@ -67,9 +67,9 @@ export default function useClobOrder(
             if (params.side === "BUY") {
               aggressivePrice = Math.min(0.99, marketPrice * 1.05);
             } else {
-              aggressivePrice = Math.max(0.0001, marketPrice * 0.90);
+              aggressivePrice = Math.max(0.0001, marketPrice * 0.9);
             }
-            
+
             console.log(
               `Using aggressive price: ${aggressivePrice} for ${params.side}`
             );

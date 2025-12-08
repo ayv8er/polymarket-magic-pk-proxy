@@ -1,15 +1,15 @@
 "use client";
 
-import SessionInfo from "../../components/TradingSession/SessionInfo";
-import SessionStatus from "../../components/TradingSession/SessionStatus";
-import SessionSuccess from "../../components/TradingSession/SessionSuccess";
-import SessionActions from "../../components/TradingSession/SessionActions";
-import SessionProgress from "../../components/TradingSession/SessionProgress";
+import SessionInfo from "@/components/TradingSession/SessionInfo";
+import SessionStatus from "@/components/TradingSession/SessionStatus";
+import SessionSuccess from "@/components/TradingSession/SessionSuccess";
+import SessionActions from "@/components/TradingSession/SessionActions";
+import SessionProgress from "@/components/TradingSession/SessionProgress";
 
 import type {
   TradingSession as TradingSessionType,
   SessionStep,
-} from "../../utils/session";
+} from "@/utils/session";
 
 interface Props {
   session: TradingSessionType | null;

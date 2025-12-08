@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 
-import Card from "../../components/shared/Card";
-import ActiveOrders from "../../components/Trading/Orders";
-import UserPositions from "../../components/Trading/Positions";
-import HighVolumeMarkets from "../../components/Trading/Markets";
+import Card from "@/components/shared/Card";
+import ActiveOrders from "@/components/Trading/Orders";
+import UserPositions from "@/components/Trading/Positions";
+import HighVolumeMarkets from "@/components/Trading/Markets";
 
-import { cn } from "../../utils/classNames";
+import { cn } from "@/utils/classNames";
 
 type TabId = "positions" | "orders" | "markets";
 
