@@ -1,4 +1,4 @@
-import type { PolymarketMarket } from "@/hooks/useHighVolumeMarkets";
+import type { PolymarketMarket } from "@/hooks/useMarkets";
 
 import Card from "@/components/shared/Card";
 import Badge from "@/components/shared/Badge";
@@ -9,6 +9,7 @@ import { formatVolume, formatLiquidity } from "@/utils/formatting";
 
 interface MarketCardProps {
   market: PolymarketMarket;
+  disabled?: boolean;
   onOutcomeClick: (
     marketTitle: string,
     outcome: string,
@@ -20,6 +21,7 @@ interface MarketCardProps {
 
 export default function MarketCard({
   market,
+  disabled = false,
   onOutcomeClick,
 }: MarketCardProps) {
   const volumeUSD = parseFloat(
@@ -79,6 +81,7 @@ export default function MarketCard({
             isClosed={isClosed}
             negRisk={negRisk}
             marketQuestion={market.question}
+            disabled={disabled}
             onOutcomeClick={onOutcomeClick}
           />
         </div>
