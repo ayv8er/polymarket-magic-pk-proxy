@@ -1,16 +1,22 @@
 "use client";
-import { Wallet, providers } from "ethers";
 import { createPublicClient, http, PublicClient } from "viem";
-import { createContext, useContext, useState, useMemo, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  ReactNode,
+} from "react";
 import { POLYGON_RPC_URL } from "@/constants/polymarket";
 import { polygon } from "viem/chains";
 
 interface WalletContextType {
-  privateKey: string;
-  setPrivateKey: (pk: string) => void;
-  wallet: Wallet | null;
   eoaAddress: string | undefined;
+  proxyAddress: string | null;
   isConnected: boolean;
+  isLoading: boolean;
+  error: string | null;
   publicClient: PublicClient;
 }
 
@@ -22,33 +28,46 @@ const publicClient = createPublicClient({
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export default function WalletProvider({ children }: { children: ReactNode }) {
-  const [privateKey, setPrivateKey] = useState<string>("");
+  const [eoaAddress, setEoaAddress] = useState<string | undefined>(undefined);
+  const [proxyAddress, setProxyAddress] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { wallet, eoaAddress } = useMemo(() => {
-    if (!privateKey || !privateKey.startsWith("0x")) {
-      return { wallet: null, eoaAddress: undefined };
+  useEffect(() => {
+    async function fetchWalletInfo() {
+      try {
+        const res = await fetch("/api/wallet");
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(data.error || "Failed to load wallet");
+          return;
+        }
+
+        setEoaAddress(data.eoaAddress);
+        setProxyAddress(data.proxyAddress);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch wallet info:", err);
+        setError("Failed to connect to wallet API");
+      } finally {
+        setIsLoading(false);
+      }
     }
 
-    try {
-      const provider = new providers.JsonRpcProvider(POLYGON_RPC_URL);
-      const wallet = new Wallet(privateKey, provider);
-      return { wallet, eoaAddress: wallet.address };
-    } catch (error) {
-      console.error("Invalid private key", error);
-      return { wallet: null, eoaAddress: undefined };
-    }
-  }, [privateKey]);
+    fetchWalletInfo();
+  }, []);
 
   const value = useMemo<WalletContextType>(
     () => ({
-      privateKey,
-      setPrivateKey,
-      wallet,
       eoaAddress,
-      isConnected: wallet !== null,
+      proxyAddress,
+      isConnected: !!eoaAddress && !!proxyAddress,
+      isLoading,
+      error,
       publicClient,
     }),
-    [privateKey, wallet, eoaAddress]
+    [eoaAddress, proxyAddress, isLoading, error]
   );
 
   return (
@@ -56,7 +75,6 @@ export default function WalletProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Single hook to access wallet - replaces useWalletFromPK
 export function useWallet() {
   const context = useContext(WalletContext);
   if (!context) {
