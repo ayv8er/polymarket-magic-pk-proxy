@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { RelayClient } from "@polymarket/builder-relayer-client";
 import { createRedeemTx, RedeemParams } from "@/utils/redeem";
 
 export default function useRedeemPosition() {
@@ -7,24 +6,28 @@ export default function useRedeemPosition() {
   const [error, setError] = useState<Error | null>(null);
 
   const redeemPosition = useCallback(
-    async (
-      relayClient: RelayClient,
-      params: RedeemParams
-    ): Promise<boolean> => {
+    async (params: RedeemParams): Promise<boolean> => {
       setIsRedeeming(true);
       setError(null);
 
       try {
         const redeemTx = createRedeemTx(params);
 
-        // Use relayClient.execute() for gasless redemption
-        // Polymarket pays the gas fees through the relayer
-        const response = await relayClient.execute(
-          [redeemTx],
-          `Redeem position for condition ${params.conditionId}`
-        );
+        const response = await fetch("/api/wallet/relay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transactions: [redeemTx],
+            description: `Redeem position for condition ${params.conditionId}`,
+          }),
+        });
 
-        await response.wait();
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to redeem position");
+        }
+
         return true;
       } catch (err) {
         const error =
