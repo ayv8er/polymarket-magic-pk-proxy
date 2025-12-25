@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ClobClient } from "@polymarket/clob-client";
+import { TradingSession } from "@/utils/session";
 
 export type PolymarketOrder = {
   id: string;
@@ -20,36 +20,37 @@ export type PolymarketOrder = {
 };
 
 export default function useActiveOrders(
-  clobClient: ClobClient | null,
-  walletAddress: string | undefined
+  tradingSession: TradingSession | null,
+  isTradingSessionComplete: boolean | undefined
 ) {
   return useQuery({
-    queryKey: ["active-orders", walletAddress],
+    queryKey: ["active-orders", tradingSession?.proxyAddress],
     queryFn: async (): Promise<PolymarketOrder[]> => {
-      if (!clobClient || !walletAddress) {
+      if (!isTradingSessionComplete || !tradingSession?.apiCredentials) {
         return [];
       }
 
       try {
-        const allOrders = await clobClient.getOpenOrders();
-
-        const userOrders = allOrders.filter((order: any) => {
-          const orderMaker = (order.maker_address || "").toLowerCase();
-          const userAddr = walletAddress.toLowerCase();
-          return orderMaker === userAddr;
+        const params = new URLSearchParams({
+          apiKey: tradingSession.apiCredentials.key,
+          apiSecret: tradingSession.apiCredentials.secret,
+          apiPassphrase: tradingSession.apiCredentials.passphrase,
         });
 
-        const activeOrders = userOrders.filter((order: any) => {
-          return order.status === "LIVE";
-        });
+        const response = await fetch(`/api/orders/active?${params.toString()}`);
+        const data = await response.json();
 
-        return activeOrders as PolymarketOrder[];
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch orders");
+        }
+
+        return data.orders as PolymarketOrder[];
       } catch (err) {
         console.error("Error fetching open orders:", err);
         return [];
       }
     },
-    enabled: !!clobClient && !!walletAddress,
+    enabled: !!isTradingSessionComplete && !!tradingSession?.apiCredentials,
     staleTime: 2_000,
     refetchInterval: 3_000,
     refetchIntervalInBackground: true,
