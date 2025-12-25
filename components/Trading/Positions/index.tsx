@@ -18,26 +18,25 @@ import { DUST_THRESHOLD } from "@/constants/validation";
 import { POLLING_DURATION, POLLING_INTERVAL } from "@/constants/query";
 
 export default function UserPositions() {
-  const { clobClient, eoaAddress, proxyAddress, relayClient } = useTrading();
-
+  const [redeemingAsset, setRedeemingAsset] = useState<string | null>(null);
+  const [sellingAsset, setSellingAsset] = useState<string | null>(null);
+  const [pendingVerification, setPendingVerification] = useState<
+  Map<string, number>
+  >(new Map());
+  const [hideDust, setHideDust] = useState(true);
+  
+  const { tradingSession, isTradingSessionComplete, proxyAddress } = useTrading();
+  const { submitOrder, isSubmitting } = useClobOrder(tradingSession, isTradingSessionComplete);
+  
   const {
     data: positions,
     isLoading,
     error,
   } = useUserPositions(proxyAddress as string | undefined);
-
-  const [hideDust, setHideDust] = useState(true);
-  const [redeemingAsset, setRedeemingAsset] = useState<string | null>(null);
-
-  const { redeemPosition, isRedeeming } = useRedeemPosition();
-  const { submitOrder, isSubmitting } = useClobOrder(clobClient, eoaAddress);
-  const [sellingAsset, setSellingAsset] = useState<string | null>(null);
-
-  const [pendingVerification, setPendingVerification] = useState<
-    Map<string, number>
-  >(new Map());
+  
+  const { redeemPosition } = useRedeemPosition();
   const queryClient = useQueryClient();
-
+  
   useEffect(() => {
     if (!positions || pendingVerification.size === 0) return;
 
@@ -99,14 +98,14 @@ export default function UserPositions() {
   };
 
   const handleRedeem = async (position: PolymarketPosition) => {
-    if (!relayClient) {
-      alert("Relay client not initialized");
+    if (!isTradingSessionComplete) {
+      alert("Trading session not initialized");
       return;
     }
 
     setRedeemingAsset(position.asset);
     try {
-      await redeemPosition(relayClient, {
+      await redeemPosition({
         conditionId: position.conditionId,
         outcomeIndex: position.outcomeIndex,
       });
@@ -190,8 +189,8 @@ export default function UserPositions() {
             isRedeeming={redeemingAsset === position.asset}
             isPendingVerification={pendingVerification.has(position.asset)}
             isSubmitting={isSubmitting}
-            canSell={!!clobClient}
-            canRedeem={!!relayClient}
+            canSell={!!isTradingSessionComplete}
+            canRedeem={!!isTradingSessionComplete}
           />
         ))}
       </div>

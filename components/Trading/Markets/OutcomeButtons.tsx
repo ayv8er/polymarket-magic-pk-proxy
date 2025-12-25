@@ -8,6 +8,7 @@ interface OutcomeButtonsProps {
   isClosed: boolean;
   negRisk: boolean;
   marketQuestion: string;
+  disabled?: boolean;
   onOutcomeClick: (
     marketTitle: string,
     outcome: string,
@@ -24,9 +25,12 @@ export default function OutcomeButtons({
   isClosed,
   negRisk,
   marketQuestion,
+  disabled = false,
   onOutcomeClick,
 }: OutcomeButtonsProps) {
   if (outcomes.length === 0) return null;
+
+  const isDisabled = isClosed || disabled;
 
   return (
     <div className="flex gap-2 flex-wrap">
@@ -39,7 +43,7 @@ export default function OutcomeButtons({
           <button
             key={`outcome-${idx}`}
             onClick={() => {
-              if (!isClosed && tokenId) {
+              if (!isDisabled && tokenId) {
                 onOutcomeClick(
                   marketQuestion,
                   outcome,
@@ -49,10 +53,10 @@ export default function OutcomeButtons({
                 );
               }
             }}
-            disabled={isClosed || !tokenId}
+            disabled={isDisabled || !tokenId}
             className={cn(
               "flex-1 min-w-[120px] px-3 py-2 rounded border transition-all duration-200",
-              isClosed || !tokenId
+              isDisabled || !tokenId
                 ? "bg-white/5 border-white/10 cursor-not-allowed opacity-50"
                 : "bg-white/5 border-white/10 hover:bg-blue-500/20 hover:border-blue-500/40 cursor-pointer"
             )}

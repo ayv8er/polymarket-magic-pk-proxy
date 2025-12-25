@@ -1,12 +1,9 @@
 "use client";
 
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useCallback } from "react";
 import { useWallet } from "./WalletProvider";
-import useClobClient from "@/hooks/useClobClient";
-import useProxyWallet from "@/hooks/useProxyWallet";
 import useTradingSession from "@/hooks/useTradingSession";
-import type { ClobClient } from "@polymarket/clob-client";
-import type { RelayClient } from "@polymarket/builder-relayer-client";
+import useGeoblock, { GeoblockStatus } from "@/hooks/useGeoblock";
 import { TradingSession, SessionStep } from "@/utils/session";
 
 interface TradingContextType {
@@ -16,11 +13,12 @@ interface TradingContextType {
   isTradingSessionComplete: boolean | undefined;
   initializeTradingSession: () => Promise<void>;
   endTradingSession: () => void;
-  clobClient: ClobClient | null;
-  relayClient: RelayClient | null;
   eoaAddress: string | undefined;
   proxyAddress: string | null;
   isConnected: boolean;
+  isGeoblocked: boolean;
+  isGeoblockLoading: boolean;
+  geoblockStatus: GeoblockStatus | null;
 }
 
 const TradingContext = createContext<TradingContextType | null>(null);
@@ -32,24 +30,31 @@ export function useTrading() {
 }
 
 export default function TradingProvider({ children }: { children: ReactNode }) {
-  const { wallet, eoaAddress, isConnected } = useWallet();
-  const { proxyAddress } = useProxyWallet();
+  const { eoaAddress, proxyAddress, isConnected } = useWallet();
+
+  const {
+    isBlocked: isGeoblocked,
+    isLoading: isGeoblockLoading,
+    geoblockStatus,
+  } = useGeoblock();
 
   const {
     tradingSession,
     currentStep,
     sessionError,
     isTradingSessionComplete,
-    initializeTradingSession,
+    initializeTradingSession: initSession,
     endTradingSession,
-    relayClient,
   } = useTradingSession();
 
-  const { clobClient } = useClobClient(
-    wallet,
-    tradingSession,
-    isTradingSessionComplete
-  );
+  const initializeTradingSession = useCallback(async () => {
+    if (isGeoblocked) {
+      throw new Error(
+        "Trading is not available in your region. Polymarket is geoblocked in your location."
+      );
+    }
+    return initSession();
+  }, [isGeoblocked, initSession]);
 
   return (
     <TradingContext.Provider
@@ -60,11 +65,12 @@ export default function TradingProvider({ children }: { children: ReactNode }) {
         isTradingSessionComplete,
         initializeTradingSession,
         endTradingSession,
-        clobClient,
-        relayClient,
         eoaAddress,
         proxyAddress,
         isConnected,
+        isGeoblocked,
+        isGeoblockLoading,
+        geoblockStatus,
       }}
     >
       {children}

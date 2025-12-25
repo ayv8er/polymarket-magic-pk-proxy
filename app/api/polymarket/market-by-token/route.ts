@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Try active markets first
     let response = await fetch(
       `${GAMMA_API}/markets?limit=100&offset=0&active=true&closed=false`,
       {
@@ -48,7 +47,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // If not found in active markets, search closed markets
     if (!market) {
       response = await fetch(
         `${GAMMA_API}/markets?limit=100&offset=0&closed=true`,
@@ -72,6 +70,13 @@ export async function GET(request: NextRequest) {
           });
         }
       }
+    }
+
+    if (!market) {
+      return NextResponse.json(
+        { error: "Market not found for token" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(market);

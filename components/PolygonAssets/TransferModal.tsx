@@ -23,7 +23,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
-  const { relayClient, proxyAddress } = useTrading();
+  const { isTradingSessionComplete, proxyAddress } = useTrading();
   const { isTransferring, error, transferUsdc } = useUsdcTransfer();
   const { formattedUsdcBalance, rawUsdcBalance } =
     usePolygonBalances(proxyAddress);
@@ -58,11 +58,11 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
   if (!isOpen) return null;
 
   const handleTransfer = async () => {
-    if (!relayClient || !recipient || !amount) return;
+    if (!isTradingSessionComplete || !recipient || !amount) return;
 
     try {
       const amountBigInt = parseUnits(amount, USDC_E_DECIMALS);
-      await transferUsdc(relayClient, {
+      await transferUsdc({
         recipient: recipient as `0x${string}`,
         amount: amountBigInt,
       });
@@ -168,13 +168,13 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
           {/* Send Button */}
           <button
             onClick={handleTransfer}
-            disabled={isTransferring || !recipient || !amount || !relayClient}
+            disabled={isTransferring || !recipient || !amount || !isTradingSessionComplete}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
           >
             {isTransferring ? "Sending..." : "Send USDC.e"}
           </button>
 
-          {!relayClient && (
+          {!isTradingSessionComplete && (
             <p className="text-xs text-yellow-400 mt-2 text-center">
               Start a trading session first
             </p>

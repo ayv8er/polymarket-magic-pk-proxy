@@ -4,13 +4,14 @@ A Next.js application demonstrating how to integrate Polymarket trading for user
 
 Non-Safe Proxy Wallets are deployed for Magic users on `Polymarket.com`. If your goal is to enable these traders to manage the same account on both apps, you will need to interact with this custom proxy wallet that's only used for Magic users.
 
-This demo covers;
+## Key Features
 
-- User importing Magic wallet private keys as authentication (no storage)
-- Derivation of the **Non-Safe Proxy Wallet** address deterministically (does not deploy)
-- Obtaining **User API Credentials** from the CLOB client
-- Place orders with Magic Link EOA signature through the Proxy Wallet
-- Manage positions and active orders
+- **Server-side private key handling** — Private key stored securely in `.env.local`
+- **Deterministic proxy wallet derivation** — Non-Safe Proxy Wallet address derived via CREATE2
+- **Server-side order signing** — All trading operations happen through API routes
+- **Market & limit orders** — Market orders (FOK) and limit orders (GTC) with dynamic tick sizes
+- **Position & order management** — View positions, active orders, and cancel orders
+- **Gasless transactions** — Token approvals, transfers, and redemptions via Builder Relayer
 
 ---
 
@@ -18,20 +19,13 @@ This demo covers;
 
 1. [Prerequisites](#prerequisites)
 2. [Quick Start](#quick-start)
-3. [Core Integration Patterns](#core-integration-patterns)
-   - [Flow Overview](#flow-overview)
-   - [New User Flow](#new-user-flow)
-   - [Returning User Flow](#returning-user-flow)
-4. [Key Implementation Details](#key-implementation-details)
-   - [1. Magic Wallet Private Key Input](#1-magic-wallet-private-key-input)
-   - [2. Proxy Wallet Derivation](#2-proxy-wallet-derivation)
-   - [3. User API Credentials](#3-user-api-credentials)
-   - [4. Authenticated ClobClient](#4-authenticated-clobclient)
-   - [5. Placing Orders](#5-placing-orders)
-   - [6. Position & Order Management](#6-position--order-management)
-5. [Project Structure](#project-structure)
-6. [Environment Variables](#environment-variables)
-7. [Key Dependencies](#key-dependencies)
+3. [Architecture Overview](#architecture-overview)
+4. [API Routes](#api-routes)
+5. [Key Implementation Details](#key-implementation-details)
+6. [Project Structure](#project-structure)
+7. [Environment Variables](#environment-variables)
+8. [Key Dependencies](#key-dependencies)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -53,7 +47,7 @@ Before running this demo, you need:
 
 4. **USDC.e Funds**
    - Send USDC.e to the **Non-Safe Proxy Wallet** (not EOA) for trading
-   - If unsure of your Non-Safe Proxy Wallet address, get it from either the listed address on `polymarket.com`after logging in, or simply start this demo and input your private key
+   - If unsure of your Non-Safe Proxy Wallet address, get it from either the listed address on `polymarket.com` after logging in, or simply start this demo
 
 ---
 
@@ -70,11 +64,11 @@ npm install
 Create `.env.local`:
 
 ```bash
-# Polygon RPC endpoint
-NEXT_PUBLIC_POLYGON_RPC_URL=https://polygon-rpc.com
+# Required: Your Magic wallet private key (obtained from reveal.magic.link/polymarket)
+POLYMARKET_MAGIC_PK=0x...your_private_key_here
 
-# Or use Alchemy/Infura:
-# NEXT_PUBLIC_POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_KEY
+# Optional: Custom Polygon RPC endpoint
+NEXT_PUBLIC_POLYGON_RPC_URL=https://polygon-rpc.com
 ```
 
 ### Run Development Server
@@ -87,291 +81,305 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Core Integration Patterns
+## Architecture Overview
 
-### Flow Overview
+This demo uses a **server-side architecture** where the private key never leaves the server:
 
-This application demonstrates how Magic Link users can trade on external Polymarket integrations with the same Non-Safe Proxy Wallet:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Browser (Client)                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  • React UI components                                          │
+│  • TradingSession context (stores API credentials in memory)    │
+│  • Calls API routes for all wallet/trading operations           │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ HTTP Requests
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Next.js API Routes (Server)                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  • Private key loaded from .env.local                           │
+│  • Proxy wallet derivation                                      │
+│  • API credential generation                                    │
+│  • Order signing & submission                                   │
+│  • Relay transactions (approvals, transfers, redemptions)       │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Polymarket APIs                                                │
+├─────────────────────────────────────────────────────────────────┤
+│  • CLOB API (clob.polymarket.com) — Orders, prices, tick sizes  │
+│  • Data API (data-api.polymarket.com) — Positions               │
+│  • Gamma API (gamma-api.polymarket.com) — Market data           │
+│  • Builder Relayer — Gasless transactions                       │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-#### **User Flow**
+---
 
-1. User has a history of trading on `polymarket.com` via email login / Google OAuth
-2. User obtains and submits Magic wallet private key to authenticate into demo app
-3. App derives deterministic **Non-Safe Proxy Wallet** address
-4. Display both EOA (signing wallet) and Proxy (funding/trading wallet) address
-5. Initialize **ClobClient** with Magic signature type (signatureType: 1)
-6. Obtain **User API Credentials** via `createOrDeriveApiKey()`
-7. Initialize authenticated **ClobClient** with credentials
-8. Ready to trade
+## API Routes
+
+### Wallet Operations
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/wallet` | GET | Returns EOA and derived proxy wallet addresses |
+| `/api/wallet/credentials` | POST | Creates or derives User API credentials |
+| `/api/wallet/relay` | POST | Executes gasless relay transactions (approvals, transfers, redemptions) |
+
+### Order Management
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/orders` | POST | Creates and submits market/limit orders |
+| `/api/orders` | DELETE | Cancels an active order |
+| `/api/orders/active` | GET | Fetches all active orders for the wallet |
+
+### Market Data
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/polymarket/markets` | GET | Fetches high-volume markets from Gamma API |
+| `/api/polymarket/market-by-token` | GET | Fetches market details by token ID |
+| `/api/polymarket/positions` | GET | Fetches user positions from Data API |
+| `/api/polymarket/prices` | POST | Batch fetches real-time bid/ask prices |
+| `/api/polymarket/tick-size` | GET | Fetches minimum tick size for a token |
+| `/api/polymarket/sign` | POST | Signs messages for Builder authentication |
 
 ---
 
 ## Key Implementation Details
 
-### 1. Magic Wallet Private Key Input
+### 1. Server-Side Wallet Management
 
-**File**: `components/Header.tsx`
+**File**: `app/api/wallet/route.ts`
 
-Users paste their Magic wallet private key (obtained from reveal.magic.link) into the app. This creates an ethers Wallet instance for signing.
+The private key is loaded from environment variables and never exposed to the client:
 
 ```typescript
-import { Wallet } from "ethers";
+import { Wallet, providers } from "ethers";
+import { deriveProxyAddress } from "@/utils/proxyWallet";
 
-const wallet = new Wallet(privateKey);
-const eoaAddress = wallet.address;
+const privateKey = process.env.POLYMARKET_MAGIC_PK;
+const provider = new providers.JsonRpcProvider(POLYGON_RPC_URL);
+const wallet = new Wallet(privateKey, provider);
+const proxyAddress = deriveProxyAddress(wallet.address);
 ```
-
-**⚠️ Security Warning**: This demo stores the private key in React state for simplicity. **This is NOT production-ready**. In production, use secure key management solutions or server-side signing.
-
----
 
 ### 2. Proxy Wallet Derivation
 
-**File**: `hooks/useProxyWallet.ts`
+**File**: `utils/proxyWallet.ts`
 
-Polymarket's Magic auth creates a **Non-Safe Proxy Wallet** (EIP-1167 minimal proxy) that is deterministically derived from the user's EOA using CREATE2.
+Polymarket's Magic auth creates a **Non-Safe Proxy Wallet** (EIP-1167 minimal proxy) that is deterministically derived from the user's EOA using CREATE2:
 
 ```typescript
-import { keccak256, getAddress, concat } from "viem";
+import { keccak256, getCreate2Address, encodePacked } from "viem";
+import { PROXY_FACTORY, PROXY_INIT_CODE_HASH } from "@/constants/proxyWallet";
 
-const PROXY_FACTORY = "0xaB45c5A4B0c941a2F231C04C3f49182e1A254052";
-const PROXY_IMPLEMENTATION = "0x44e999d5c2F66Ef0861317f9A4805AC2e90aEB4f";
-
-// CREATE2 derivation
-const salt = keccak256(eoaAddress);
-const initCode = concat([
-  "0x3d602d80600a3d3981f3363d3d373d3d3d363d73",
-  PROXY_IMPLEMENTATION,
-  "0x5af43d82803e903d91602b57fd5bf3",
-]);
-const initCodeHash = keccak256(initCode);
-const hash = keccak256(concat(["0xff", PROXY_FACTORY, salt, initCodeHash]));
-const proxyAddress = getAddress(`0x${hash.slice(26)}`);
+export function deriveProxyAddress(eoaAddress: string): string {
+  return getCreate2Address({
+    bytecodeHash: PROXY_INIT_CODE_HASH,
+    from: PROXY_FACTORY,
+    salt: keccak256(encodePacked(["address"], [eoaAddress])),
+  });
+}
 ```
 
 **Key Points:**
-
-- Polymarket does not deploy a Safe Proxy Wallet for Magic users, like the one's deployed by using the Relayer Client.
-- Proxy address is **deterministic** - same EOA always gets same proxy address
+- Proxy address is **deterministic** — same EOA always gets same proxy address
 - Proxy is the "funder" address that holds USDC.e and outcome tokens
 - User must fund the **Proxy Wallet**, not the EOA
-- Proxy must be deployed by Polymarket and token approvals set during their first trade (happens after first login and trade at `polymarket.com`)
 
----
+### 3. Order Placement
 
-### 3. User API Credentials
+**File**: `app/api/orders/route.ts`
 
-**File**: `hooks/useClobClient.ts`
+Orders are signed and submitted server-side:
 
-User API Credentials are obtained by creating a temporary **ClobClient** and calling `createOrDeriveApiKey()`.
-
-```typescript
-import { ClobClient } from "@polymarket/clob-client";
-
-// Create temporary CLOB client (no credentials yet)
-const tempClient = new ClobClient(
-  "https://clob.polymarket.com",
-  137, // Polygon chain ID
-  wallet // Magic EOA signer
-);
-
-// Get or create credentials (prompts user signature)
-const creds = await tempClient.createOrDeriveApiKey();
-// creds = { key: string, secret: string, passphrase: string }
-```
-
-**Flow:**
-
-1. **First-time users**: `createOrDeriveApiKey()` creates new credentials
-2. **Returning users**: Same method retrieves existing credentials
-3. Requires user signature (EIP-712)
-4. Credentials are stored in localStorage for current session so not all CLOB requests prompts the user for a signature
-
-**Important:**
-
-Credentials can be used to view orders and cancel limit orders, but **cannot place new orders without the private key**. Storing credentials in localStorage is **not recommended for production** due to XSS risks. Use secure httpOnly cookies or server-side session management in production.
-
----
-
-### 4. Authenticated ClobClient
-
-**File**: `hooks/useClobClient.ts`
-
-After obtaining User API Credentials, create the authenticated **ClobClient**.
+#### Market Orders (Fill or Kill)
 
 ```typescript
-import { ClobClient } from "@polymarket/clob-client";
+import { ClobClient, Side, OrderType } from "@polymarket/clob-client";
 
-const clobClient = new ClobClient(
-  "https://clob.polymarket.com",
-  137, // Polygon chain ID
-  wallet, // EOA signer
-  userApiCredentials, // { key, secret, passphrase }
-  1, // signatureType = 1 for Magic Link users
-  proxyAddress // funder address (Proxy Wallet)
-);
-```
-
-**Parameters Explained:**
-
-- **wallet**: EOA signer created from private key
-- **userApiCredentials**: Obtained from Step 3
-- **signatureType = 1**: Magic Link signature type (vs. 2 for browser wallets)
-- **proxyAddress**: The proxy wallet that holds funds
-
-**This is the persistent client used for all trading operations.**
-
----
-
-### 5. Placing Orders
-
-**File**: `hooks/useClobOrder.ts`
-
-With the authenticated ClobClient, you can place market and limit orders.
-
-#### Market Orders
-
-```typescript
-// Get current price from orderbook
-const priceResponse = await clobClient.getPrice(tokenId, side);
-const currentPrice = parseFloat(priceResponse.price);
-
-// Apply aggressive pricing for immediate fills
-const aggressivePrice =
-  side === "BUY"
-    ? Math.min(0.99, currentPrice * 1.05) // +5% above market
-    : Math.max(0.01, currentPrice * 0.95); // -5% below market
-
-// Submit as limit order with aggressive price
-const order = {
+const marketOrder: UserMarketOrder = {
   tokenID: tokenId,
-  price: aggressivePrice,
-  size: shares,
-  side: side,
+  amount: dollarAmount,  // For BUY: size * askPrice
+  side: Side.BUY,
   feeRateBps: 0,
-  expiration: 0,
-  taker: "0x0000000000000000000000000000000000000000",
 };
 
-await clobClient.createAndPostOrder(order, { negRisk }, OrderType.GTC);
+await clobClient.createAndPostMarketOrder(
+  marketOrder,
+  { negRisk: false },
+  OrderType.FOK  // Fill or Kill — immediate execution or cancel
+);
 ```
 
-**Why Aggressive Pricing?**
-
-Polymarket's CLOB doesn't have true "market orders". We simulate market execution with limit orders at aggressive prices likely to fill immediately.
-
-#### Limit Orders
+#### Limit Orders (Good Till Cancelled)
 
 ```typescript
-const limitOrder = {
+const limitOrder: UserOrder = {
   tokenID: tokenId,
-  price: userPrice, // User-specified (0.01 to 0.99)
+  price: 0.55,  // Must be multiple of tick size
   size: shares,
-  side: "BUY" | "SELL",
+  side: Side.BUY,
   feeRateBps: 0,
-  expiration: 0, // 0 = Good-til-Cancel
+  expiration: 0,
   taker: "0x0000000000000000000000000000000000000000",
 };
 
 await clobClient.createAndPostOrder(
   limitOrder,
   { negRisk: false },
-  OrderType.GTC
+  OrderType.GTC  // Good Till Cancelled
 );
 ```
 
-**Key Points:**
+### 4. Dynamic Tick Sizes
 
-- Orders are signed by the user's EOA
-- Executed from the Proxy address (funder)
-- Gasless execution (no gas fees for users)
-- Prompts user signature for each order
+**File**: `app/api/polymarket/tick-size/route.ts`
 
----
-
-### 6. Position & Order Management
-
-**Positions** (`hooks/useUserPositions.ts`, `app/api/polymarket/positions/route.ts`):
+Different markets have different minimum tick sizes (0.1, 0.01, 0.001, 0.0001). The order modal fetches the tick size and:
+- Validates price is within valid range
+- Ensures price is a multiple of tick size
+- Constrains input decimal places accordingly
 
 ```typescript
-// Fetch from Data API
-const response = await fetch(
-  `https://data-api.polymarket.com/positions?user=${proxyAddress}&sizeThreshold=0.01&limit=500`
-);
+const tickSize = await clobClient.getTickSize(tokenId);
+// Returns: 0.01, 0.001, 0.0001, etc.
 ```
 
-**Active Orders** (`hooks/useActiveOrders.ts`):
+### 5. Gasless Relay Transactions
+
+**File**: `app/api/wallet/relay/route.ts`
+
+Token approvals, USDC transfers, and position redemptions use the Builder Relayer for gasless execution:
 
 ```typescript
-// Fetch from CLOB client
-const allOrders = await clobClient.getOpenOrders();
-const userOrders = allOrders.filter(
-  (o) =>
-    o.maker_address.toLowerCase() === proxyAddress.toLowerCase() &&
-    o.status === "LIVE"
-);
-```
+import { RelayClient, RelayerTxType, CallType, encodeProxyTransactionData } from "@polymarket/builder-relayer-client";
+import { buildProxyTransactionRequest, calculateGasLimit } from "@/utils/relay";
 
-**Cancel Order**:
+// Get relay payload (nonce + relay address) from relayer
+const relayPayload = await relayClient.getRelayPayload(from, "PROXY");
 
-```typescript
-await clobClient.cancelOrder({ orderID: orderId });
+// Encode transactions (e.g., ERC20 transfer)
+const proxyTxns = transactions.map(txn => ({
+  to: txn.to,
+  typeCode: CallType.Call,
+  data: txn.data,
+  value: "0",
+}));
+
+// Build signed transaction with dynamic gas limit
+const txRequest = await buildProxyTransactionRequest(signer, {
+  from,
+  data: encodeProxyTransactionData(proxyTxns),
+  gasLimit: calculateGasLimit(transactions.length),
+  relay: relayPayload.address,
+  nonce: relayPayload.nonce,
+});
+
+// Submit to relayer
+await fetch(`${RELAYER_URL}submit`, { method: "POST", body: JSON.stringify(txRequest) });
 ```
 
 ---
 
 ## Project Structure
 
-### Core Implementation Files
-
 ```
 magic-pk/
 ├── app/
 │   ├── api/
-│   │   └── polymarket/
-│   │       ├── market-by-token/
-│   │       │   └── route.ts              # Market lookup by token ID
-│   │       ├── markets/
-│   │       │   └── route.ts              # High-volume markets (Gamma API)
-│   │       └── positions/
-│   │           └── route.ts              # User positions (Data API)
-│   ├── layout.tsx                        # React Query provider
-│   └── page.tsx                          # Main application UI
-│
-├── hooks/
-│   ├── useWalletFromPK.ts                # Create wallet from private key
-│   ├── useProxyWallet.ts                 # Derive proxy address
-│   ├── useClobClient.ts                  # CLOB client initialization
-│   ├── useClobOrder.ts                   # Order placement/cancellation
-│   ├── useActiveOrders.ts                # Fetch open orders
-│   ├── useUserPositions.ts               # Fetch user positions
-│   ├── usePolygonBalances.ts             # Check USDC.e balance
-│   └── useHighVolumeMarkets.ts           # Fetch markets
+│   │   ├── orders/
+│   │   │   ├── route.ts              # Create/cancel orders
+│   │   │   └── active/
+│   │   │       └── route.ts          # Fetch active orders
+│   │   ├── polymarket/
+│   │   │   ├── market-by-token/
+│   │   │   │   └── route.ts          # Market lookup by token
+│   │   │   ├── markets/
+│   │   │   │   └── route.ts          # High-volume markets
+│   │   │   ├── positions/
+│   │   │   │   └── route.ts          # User positions
+│   │   │   ├── prices/
+│   │   │   │   └── route.ts          # Batch price fetching
+│   │   │   ├── sign/
+│   │   │   │   └── route.ts          # Builder authentication
+│   │   │   └── tick-size/
+│   │   │       └── route.ts          # Market tick sizes
+│   │   └── wallet/
+│   │       ├── route.ts              # EOA/proxy addresses
+│   │       ├── credentials/
+│   │       │   └── route.ts          # API credentials
+│   │       └── relay/
+│   │           └── route.ts          # Gasless transactions
+│   ├── layout.tsx
+│   └── page.tsx
 │
 ├── components/
-│   ├── Header.tsx                        # PK input, wallet display
-│   ├── PolygonAssets.tsx                 # Balance display
+│   ├── Header.tsx                    # Wallet address display
+│   ├── PolygonAssets/
+│   │   ├── index.tsx                 # Balance display
+│   │   └── TransferModal.tsx         # USDC transfer UI
 │   ├── Trading/
-│   │   ├── MarketTabs.tsx                # Tab navigation
+│   │   ├── MarketTabs.tsx            # Tab navigation
 │   │   ├── Markets/
-│   │   │   └── index.tsx                 # Market browser
+│   │   │   └── index.tsx             # Market browser
 │   │   ├── OrderModal/
-│   │   │   └── index.tsx                 # Order placement UI
-│   │   ├── Positions/
-│   │   │   └── index.tsx                 # Position cards
-│   │   └── Orders/
-│   │       └── index.tsx                 # Open orders list
+│   │   │   ├── index.tsx             # Order placement UI
+│   │   │   ├── OrderForm.tsx         # Size/price inputs
+│   │   │   ├── OrderSummary.tsx      # Cost calculation
+│   │   │   └── OrderTypeToggle.tsx   # Market/limit toggle
+│   │   ├── Orders/
+│   │   │   └── index.tsx             # Active orders list
+│   │   └── Positions/
+│   │       └── index.tsx             # Position cards
 │   └── TradingSession/
-│       └── index.tsx                     # CLOB authentication UI
+│       └── index.tsx                 # Session initialization UI
+│
+├── hooks/
+│   ├── useActiveOrders.ts            # Fetch/cancel orders via API
+│   ├── useAddressCopy.ts             # Copy address to clipboard
+│   ├── useClobOrder.ts               # Submit orders via API
+│   ├── useGeoblock.ts                # Geo-restriction detection
+│   ├── useMarkets.ts                 # Fetch markets from Gamma API
+│   ├── usePolygonBalances.ts         # Check USDC.e balance
+│   ├── useRedeemPosition.ts          # Redeem via API
+│   ├── useTokenApprovals.ts          # Approve via API
+│   ├── useTradingSession.ts          # Session management
+│   ├── useUsdcTransfer.ts            # Transfer via API
+│   ├── useUserApiCredentials.ts      # API credentials management
+│   └── useUserPositions.ts           # Fetch positions
 │
 ├── providers/
-│   ├── QueryProvider.tsx                 # TanStack Query setup
-│   ├── TradingClientProvider.tsx         # Context for CLOB client
-│   └── WalletProvider.tsx                # Wallet context
+│   ├── QueryProvider.tsx             # TanStack Query setup
+│   ├── TradingProvider.tsx           # Trading session context
+│   └── WalletProvider.tsx            # Wallet addresses context
+│
+├── utils/
+│   ├── approvals.ts                  # Token approval logic
+│   ├── classNames.ts                 # CSS class utilities
+│   ├── formatting.ts                 # Number/address formatting
+│   ├── order.ts                      # Order helpers
+│   ├── polling.ts                    # Async polling utilities
+│   ├── proxyWallet.ts                # CREATE2 proxy derivation
+│   ├── redeem.ts                     # Position redemption logic
+│   ├── relay.ts                      # Relay transaction building
+│   ├── session.ts                    # TradingSession type
+│   ├── transfers.ts                  # USDC transfer utilities
+│   └── validation.ts                 # Input validation
 │
 └── constants/
-    ├── polymarket.ts                     # API URLs
-    └── tokens.ts                         # Token addresses
+    ├── api.ts                        # API endpoint URLs
+    ├── categories.ts                 # Market categories
+    ├── polymarket.ts                 # API URLs, chain ID
+    ├── proxyWallet.ts                # Proxy contract addresses
+    ├── query.ts                      # React Query keys
+    ├── tokens.ts                     # Token addresses
+    ├── ui.ts                         # UI constants
+    └── validation.ts                 # Validation constants
 ```
 
 ---
@@ -381,109 +389,79 @@ magic-pk/
 Create `.env.local`:
 
 ```bash
-# Required: Polygon RPC
+# Required: Your Magic wallet private key
+POLYMARKET_MAGIC_PK=0x...your_64_character_hex_private_key
+
+# Optional: Custom Polygon RPC endpoint (defaults to public RPC)
 NEXT_PUBLIC_POLYGON_RPC_URL=https://polygon-rpc.com
 ```
+
+**⚠️ Security Notes:**
+- Never commit `.env.local` to version control
+- The private key is only accessible server-side
+- In production, use proper secrets management (Vault, AWS Secrets Manager, etc.)
 
 ---
 
 ## Key Dependencies
 
-| Package                                                                | Version  | Purpose                                     |
-| ---------------------------------------------------------------------- | -------- | ------------------------------------------- |
-| [`@polymarket/clob-client`](https://github.com/Polymarket/clob-client) | ^4.22.8  | Order placement, User API credentials       |
-| [`@tanstack/react-query`](https://tanstack.com/query)                  | ^5.90.10 | Server state management                     |
-| [`ethers`](https://docs.ethers.org/v5/)                                | ^5.8.0   | Wallet creation, signing, EIP-712 messages  |
-| [`viem`](https://viem.sh/)                                             | ^2.39.2  | Ethereum interactions, RPC calls, keccak256 |
-| [`next`](https://nextjs.org/)                                          | 16.0.3   | React framework, API routes                 |
-
----
-
-## Architecture Diagram
-
-```
-User's Magic Wallet Private Key
-         ↓
-    [Create ethers Wallet]
-         ↓
-┌────────────────────────────────────────────────────┐
-│  Session Initialization                            │
-├────────────────────────────────────────────────────┤
-│  1. Derive Non-Safe Proxy Wallet address (CREATE2) │
-│  2. Create temporary ClobClient                    │
-│  3. Get User API Credentials (createOrDeriveApiKey)│
-│  4. Save credentials to localStorage               │
-└────────────────────────────────────────────────────┘
-         ↓
-┌────────────────────────────────────────────────────┐
-│  Authenticated ClobClient                          │
-├────────────────────────────────────────────────────┤
-│  - User API Credentials                            │
-│  - Signature Type: 1 (Magic Link)                  │
-│  - Proxy address (funder)                          │
-│  - EOA wallet (signer)                             │
-└────────────────────────────────────────────────────┘
-         ↓
-    Place Orders
-    (Market + Limit orders)
-    (Standard + Neg Risk markets)
-```
+| Package | Version | Purpose |
+|---------|---------|---------|
+| [`@polymarket/clob-client`](https://github.com/Polymarket/clob-client) | ^4.22.8 | Order placement, API credentials, prices |
+| [`@polymarket/builder-relayer-client`](https://github.com/Polymarket/builder-relayer-client) | ^0.0.8 | Gasless relay transactions |
+| [`@polymarket/builder-signing-sdk`](https://github.com/Polymarket/builder-signing-sdk) | ^0.0.8 | Builder authentication |
+| [`@tanstack/react-query`](https://tanstack.com/query) | ^5.90.10 | Server state management |
+| [`ethers`](https://docs.ethers.org/v5/) | ^5.8.0 | Wallet creation, signing |
+| [`viem`](https://viem.sh/) | ^2.39.2 | Address derivation, hashing |
+| [`next`](https://nextjs.org/) | ^16.0.10 | React framework, API routes |
 
 ---
 
 ## Troubleshooting
 
-### "Invalid private key"
-
-- Key must start with `0x`
-- Key must be 66 characters (0x + 64 hex chars)
-- Get private key from [reveal.magic.link/polymarket](https://reveal.magic.link/polymarket) for a user with trading history on `polymarket.com`
-
-### "CLOB client not initialized"
-
-- Click "Initialize CLOB Client" button
-- Ensure private key is valid
-- Check browser console for authentication errors
+### "Wallet not configured"
+- Ensure `POLYMARKET_MAGIC_PK` is set in `.env.local`
+- Private key must start with `0x` and be 66 characters total
 
 ### Balance shows $0.00
-
 - Ensure you funded the **Proxy Wallet**, not the EOA
 - Check [Polygonscan](https://polygonscan.com) for confirmation
-- Verify RPC endpoint is working (check .env.local)
+- The app displays the proxy wallet address — send USDC.e there
 
-### Orders not appearing
+### "Order submission failed"
+- Check USDC.e balance in proxy wallet
+- Ensure trading session is initialized (click "Initialize" button)
+- For limit orders, ensure price is a valid multiple of tick size
 
-- Wait 2-3 seconds for CLOB sync
-- Check USDC.e balance (need funds to trade)
-- Verify order was submitted successfully (browser console)
+### Market orders sitting as limit orders
+- Market orders use FOK (Fill or Kill) — they should execute immediately or fail
+- If liquidity is low, the order may fail instead of partially filling
 
 ### "Proxy wallet not deployed"
-
 - Must log in to `polymarket.com` at least once via Magic Link
-- Polymarket deploys the proxy wallet on first login
-- Proxy deployment happens automatically, not in this app
+- Complete at least one trade to deploy the proxy and set approvals
+- Proxy deployment happens on Polymarket, not in this app
 
-### "Not enough balance"
-
-- Must have made at least one trade on `polymarket.com`
+### Price/tick size validation errors
+- Each market has a different tick size (0.01, 0.001, etc.)
+- The order modal shows the allowed tick size and valid range
+- Prices must be exact multiples of the tick size
 
 ---
 
 ## Resources
 
 ### Polymarket Documentation
-
 - [CLOB Client Docs](https://docs.polymarket.com/developers/CLOB/clients)
 - [Authentication](https://docs.polymarket.com/developers/CLOB/authentication)
 - [Order Placement](https://docs.polymarket.com/quickstart/orders/first-order)
 - [Proxy Wallets](https://docs.polymarket.com/developers/proxy-wallet)
 
 ### GitHub Repositories
-
 - [clob-client](https://github.com/Polymarket/clob-client)
+- [builder-relayer-client](https://github.com/Polymarket/builder-relayer-client)
 
 ### Other Resources
-
 - [Magic Link Documentation](https://magic.link/docs)
 - [EIP-712 Specification](https://eips.ethereum.org/EIPS/eip-712)
 - [EIP-1167 Minimal Proxy](https://eips.ethereum.org/EIPS/eip-1167)

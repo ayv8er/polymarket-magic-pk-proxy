@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import PolygonAssets from "@/components/PolygonAssets";
 import TradingSession from "@/components/TradingSession";
 import MarketTabs from "@/components/Trading/MarketTabs";
+import GeoBlockedBanner from "@/components/GeoBlockedBanner";
 
 export default function Home() {
   const {
@@ -17,6 +18,9 @@ export default function Home() {
     eoaAddress,
     proxyAddress,
     isConnected,
+    isGeoblocked,
+    isGeoblockLoading,
+    geoblockStatus,
   } = useTrading();
 
   return (
@@ -27,20 +31,29 @@ export default function Home() {
         proxyAddress={proxyAddress}
       />
 
+      {/* Show geoblock banner if user is in blocked region */}
+      {isGeoblocked && !isGeoblockLoading && (
+        <GeoBlockedBanner geoblockStatus={geoblockStatus} />
+      )}
+
       {isConnected && eoaAddress && proxyAddress && (
         <>
-          <TradingSession
-            session={tradingSession}
-            currentStep={currentStep}
-            error={sessionError}
-            isComplete={isTradingSessionComplete}
-            initialize={initializeTradingSession}
-            endSession={endTradingSession}
-          />
+          {/* Hide trading session initialization when geoblocked */}
+          {!isGeoblocked && (
+            <TradingSession
+              session={tradingSession}
+              currentStep={currentStep}
+              error={sessionError}
+              isComplete={isTradingSessionComplete}
+              initialize={initializeTradingSession}
+              endSession={endTradingSession}
+            />
+          )}
 
           <PolygonAssets />
 
-          {isTradingSessionComplete && <MarketTabs />}
+          {/* Markets are viewable even when geoblocked, but trading buttons should be disabled */}
+          {(isTradingSessionComplete || isGeoblocked) && <MarketTabs />}
         </>
       )}
     </div>
