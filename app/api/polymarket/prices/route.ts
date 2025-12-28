@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { ClobClient, Side } from "@polymarket/clob-client";
 import { CLOB_API_URL, POLYGON_CHAIN_ID } from "@/constants/polymarket";
 
+const isValidTokenId = (id: unknown): id is string =>
+  typeof id === "string" && /^\d{30,}$/.test(id);
+
 interface TokenPrices {
   BUY?: string;
   SELL?: string;
@@ -40,6 +43,8 @@ export async function POST(request: NextRequest) {
     > = Object.create(null);
 
     for (const tokenId of tokenIds) {
+      if (!isValidTokenId(tokenId)) continue;
+      
       const tokenPrices = pricesResponse[tokenId];
       
       if (tokenPrices) {
