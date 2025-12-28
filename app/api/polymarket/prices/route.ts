@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         midPrice: number;
         spread: number;
       }
-    > = {};
+    > = Object.create(null);
 
     for (const tokenId of tokenIds) {
       const tokenPrices = pricesResponse[tokenId];
