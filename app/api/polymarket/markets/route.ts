@@ -1,51 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GAMMA_API_URL } from "@/constants/api";
 
-const GAMMA_API = "https://gamma-api.polymarket.com";
+const MIN_LIQUIDITY_USD = 1000;
+const MIN_LIQUIDITY_NON_EVERGREEN_USD = 5000;
+
+const EVERGREEN_TAG_IDS = [2, 21, 120, 596, 1401, 100265, 100639];
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const limit = searchParams.get("limit") || "10";
+  const tagId = searchParams.get("tag_id");
 
   try {
     const fetchLimit = parseInt(limit) * 5;
 
-    const response = await fetch(
-      `${GAMMA_API}/markets?limit=${fetchLimit}&offset=0&active=true&closed=false&order=volume24hr&ascending=false`,
-      {
-        headers: { "Content-Type": "application/json" },
-        next: { revalidate: 60 },
-      }
-    );
+    let url = `${GAMMA_API_URL}/events?closed=false&order=volume24hr&ascending=false&limit=${fetchLimit}&offset=0`;
+
+    if (tagId) {
+      url += `&tag_id=${tagId}&related_tags=true`;
+    }
+
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      next: { revalidate: 60 },
+    });
 
     if (!response.ok) {
       console.error("Gamma API error:", response.status);
       throw new Error(`Gamma API error: ${response.status}`);
     }
 
-    const markets = await response.json();
+    const events = await response.json();
 
-    if (!Array.isArray(markets)) {
-      console.error("Invalid response structure:", markets);
+    if (!Array.isArray(events)) {
+      console.error("Invalid response structure:", events);
       return NextResponse.json(
         { error: "Invalid API response" },
         { status: 500 }
       );
     }
 
-    const validMarkets = markets.filter((market: any) => {
-      if (market.events && market.events.length > 0) {
-        const hasEndedEvent = market.events.some(
-          (event: any) =>
-            event.ended === true ||
-            event.live === false ||
-            event.finishedTimestamp
-        );
-        if (hasEndedEvent) return false;
-      }
+    const allMarkets: any[] = [];
 
+    for (const event of events) {
+      if (event.ended || event.closed || !event.active) continue;
+
+      const markets = event.markets || [];
+
+      for (const market of markets) {
+        allMarkets.push({
+          ...market,
+          eventTitle: event.title,
+          eventSlug: event.slug,
+          eventId: event.id,
+          eventIcon: event.image || event.icon,
+          negRisk: event.negRisk || false,
+        });
+      }
+    }
+
+    const validMarkets = allMarkets.filter((market: any) => {
       if (market.acceptingOrders === false) return false;
+      if (market.closed === true) return false;
       if (!market.clobTokenIds) return false;
-      if (market.enableOrderBook === false) return false;
+
       if (market.outcomePrices) {
         try {
           const prices = JSON.parse(market.outcomePrices);
@@ -54,42 +72,34 @@ export async function GET(request: NextRequest) {
             return priceNum >= 0.05 && priceNum <= 0.95;
           });
           if (!hasTradeablePrice) return false;
-        } catch (e) {
+        } catch {
           return false;
         }
       }
 
-      const evergreenTags = [
-        "crypto",
-        "politics",
-        "sports",
-        "technology",
-        "business",
-        "entertainment",
-        "science",
-        "ai",
-        "pop-culture",
-      ];
-
-      const marketTags =
-        market.tags?.map((t: any) => t.slug.toLowerCase()) || [];
-      const hasEvergreenTag = evergreenTags.some((tag) =>
-        marketTags.includes(tag)
+      const marketTagIds =
+        market.tags?.map((t: any) => parseInt(t.id)) || [];
+      const hasEvergreenTag = EVERGREEN_TAG_IDS.some((id) =>
+        marketTagIds.includes(id)
       );
 
       const liquidity = parseFloat(market.liquidity || "0");
-      const volume24hr = parseFloat(market.volume24hr || "0");
-      if ((!hasEvergreenTag && liquidity < 1000) || volume24hr < 100)
+
+      if (!hasEvergreenTag && liquidity < MIN_LIQUIDITY_NON_EVERGREEN_USD) {
         return false;
+      }
+      if (liquidity < MIN_LIQUIDITY_USD) return false;
 
       return true;
     });
 
     const sortedMarkets = validMarkets.sort((a: any, b: any) => {
       const aScore =
-        parseFloat(a.liquidity || "0") + parseFloat(a.volume || "0");
+        parseFloat(a.liquidity || "0") +
+        parseFloat(a.volume24hr || a.volume || "0");
       const bScore =
-        parseFloat(b.liquidity || "0") + parseFloat(b.volume || "0");
+        parseFloat(b.liquidity || "0") +
+        parseFloat(b.volume24hr || b.volume || "0");
       return bScore - aScore;
     });
 

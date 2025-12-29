@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
-import { Side, OrderType } from "@polymarket/clob-client";
-import type { ClobClient, UserOrder } from "@polymarket/clob-client";
 import { useQueryClient } from "@tanstack/react-query";
+import { TradingSession } from "@/utils/session";
 
 export type OrderParams = {
   tokenId: string;
@@ -13,21 +12,18 @@ export type OrderParams = {
 };
 
 export default function useClobOrder(
-  clobClient: ClobClient | null,
-  walletAddress: string | undefined
+  tradingSession: TradingSession | null,
+  isTradingSessionComplete: boolean | undefined
 ) {
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const submitOrder = useCallback(
     async (params: OrderParams) => {
-      if (!walletAddress) {
-        throw new Error("Wallet not connected");
-      }
-      if (!clobClient) {
-        throw new Error("CLOB client not initialized");
+      if (!isTradingSessionComplete || !tradingSession?.apiCredentials) {
+        throw new Error("Trading session not initialized");
       }
 
       setIsSubmitting(true);
@@ -35,105 +31,35 @@ export default function useClobOrder(
       setOrderId(null);
 
       try {
-        const side = params.side === "BUY" ? Side.BUY : Side.SELL;
-        let response;
-
-        if (params.isMarketOrder) {
-          let aggressivePrice: number;
-
-          try {
-            // Get opposite side's price for aggressive execution
-            const oppositeSide = params.side === "BUY" ? Side.SELL : Side.BUY;
-
-            console.log(
-              `Getting price for token ${params.tokenId}, side: ${oppositeSide}`
-            );
-
-            const priceFromOrderbook = await clobClient.getPrice(
-              params.tokenId,
-              oppositeSide
-            );
-
-            console.log("Price response:", priceFromOrderbook);
-
-            const marketPrice = parseFloat(priceFromOrderbook.price);
-
-            console.log(`Market price: ${marketPrice}`);
-
-            if (isNaN(marketPrice) || marketPrice <= 0 || marketPrice >= 1) {
-              throw new Error(`Invalid price from orderbook: ${marketPrice}`);
-            }
-
-            if (params.side === "BUY") {
-              aggressivePrice = Math.min(0.99, marketPrice * 1.05);
-            } else {
-              aggressivePrice = Math.max(0.0001, marketPrice * 0.9);
-            }
-
-            console.log(
-              `Using aggressive price: ${aggressivePrice} for ${params.side}`
-            );
-          } catch (e) {
-            console.error(
-              "Failed to get market price for token:",
-              params.tokenId
-            );
-            console.error("Side:", params.side);
-            console.error("Full error:", e);
-
-            aggressivePrice = params.side === "BUY" ? 0.99 : 0.01;
-            console.warn(
-              `Cannot get market price, using fallback: ${aggressivePrice}. Error:`,
-              e instanceof Error ? e.message : "Unknown"
-            );
-          }
-
-          const limitOrder: UserOrder = {
-            tokenID: params.tokenId,
-            price: aggressivePrice,
+        const response = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tokenId: params.tokenId,
             size: params.size,
-            side,
-            feeRateBps: 0,
-            expiration: 0,
-            taker: "0x0000000000000000000000000000000000000000",
-          };
-
-          response = await clobClient.createAndPostOrder(
-            limitOrder,
-            { negRisk: params.negRisk },
-            OrderType.GTC
-          );
-        } else {
-          if (!params.price) {
-            throw new Error("Price required for limit orders");
-          }
-
-          const limitOrder: UserOrder = {
-            tokenID: params.tokenId,
             price: params.price,
-            size: params.size,
-            side,
-            feeRateBps: 0,
-            expiration: 0,
-            taker: "0x0000000000000000000000000000000000000000",
-          };
+            side: params.side,
+            negRisk: params.negRisk,
+            isMarketOrder: params.isMarketOrder,
+            apiCredentials: tradingSession.apiCredentials,
+          }),
+        });
 
-          response = await clobClient.createAndPostOrder(
-            limitOrder,
-            { negRisk: params.negRisk },
-            OrderType.GTC
-          );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Order submission failed");
         }
 
-        if (response.orderID) {
-          setOrderId(response.orderID);
+        if (data.orderId) {
+          setOrderId(data.orderId);
           queryClient.invalidateQueries({ queryKey: ["active-orders"] });
           queryClient.invalidateQueries({ queryKey: ["polymarket-positions"] });
-          return { success: true, orderId: response.orderID };
+          return { success: true, orderId: data.orderId };
         } else {
-          throw new Error("Order submission failed");
+          throw new Error("Order submission failed - no order ID returned");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         const error =
           err instanceof Error ? err : new Error("Failed to submit order");
         setError(error);
@@ -142,23 +68,37 @@ export default function useClobOrder(
         setIsSubmitting(false);
       }
     },
-    [clobClient, walletAddress, queryClient]
+    [tradingSession, isTradingSessionComplete, queryClient]
   );
 
   const cancelOrder = useCallback(
-    async (orderId: string) => {
-      if (!clobClient) {
-        throw new Error("CLOB client not initialized");
+    async (orderIdToCancel: string) => {
+      if (!isTradingSessionComplete || !tradingSession?.apiCredentials) {
+        throw new Error("Trading session not initialized");
       }
 
       setIsSubmitting(true);
       setError(null);
 
       try {
-        await clobClient.cancelOrder({ orderID: orderId });
+        const response = await fetch("/api/orders", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: orderIdToCancel,
+            apiCredentials: tradingSession.apiCredentials,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to cancel order");
+        }
+
         queryClient.invalidateQueries({ queryKey: ["active-orders"] });
         return { success: true };
-      } catch (err: any) {
+      } catch (err: unknown) {
         const error =
           err instanceof Error ? err : new Error("Failed to cancel order");
         setError(error);
@@ -167,7 +107,7 @@ export default function useClobOrder(
         setIsSubmitting(false);
       }
     },
-    [clobClient, queryClient]
+    [tradingSession, isTradingSessionComplete, queryClient]
   );
 
   return {

@@ -1,8 +1,5 @@
 import { useCallback } from "react";
-import { RelayClient } from "@polymarket/builder-relayer-client";
 import { checkAllApprovals, createAllApprovalTxs } from "@/utils/approvals";
-
-// Uses relayClient to set all required token approvals for trading (gasless)
 
 export default function useTokenApprovals() {
   const checkAllTokenApprovals = useCallback(async (proxyAddress: string) => {
@@ -15,24 +12,31 @@ export default function useTokenApprovals() {
     }
   }, []);
 
-  const setAllTokenApprovals = useCallback(
-    async (relayClient: RelayClient): Promise<boolean> => {
-      try {
-        const approvalTxs = createAllApprovalTxs();
-        const response = await relayClient.execute(
-          approvalTxs,
-          "Set all token approvals for trading"
-        );
+  const setAllTokenApprovals = useCallback(async (): Promise<boolean> => {
+    try {
+      const approvalTxs = createAllApprovalTxs();
 
-        await response.wait();
-        return true;
-      } catch (err) {
-        console.error("Failed to set all token approvals:", err);
-        return false;
+      const response = await fetch("/api/wallet/relay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactions: approvalTxs,
+          description: "Set all token approvals for trading",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to set approvals");
       }
-    },
-    []
-  );
+
+      return true;
+    } catch (err) {
+      console.error("Failed to set all token approvals:", err);
+      return false;
+    }
+  }, []);
 
   return {
     checkAllTokenApprovals,

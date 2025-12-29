@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { useTrading } from "@/providers";
-import useHighVolumeMarkets from "@/hooks/useHighVolumeMarkets";
+import useMarkets from "@/hooks/useMarkets";
+import { type CategoryId, DEFAULT_CATEGORY, getCategoryById } from "@/constants/categories";
 
 import ErrorState from "@/components/shared/ErrorState";
 import EmptyState from "@/components/shared/EmptyState";
 import LoadingState from "@/components/shared/LoadingState";
 import MarketCard from "@/components/Trading/Markets/MarketCard";
+import CategoryTabs from "@/components/Trading/Markets/CategoryTabs";
 import OrderPlacementModal from "@/components/Trading/OrderModal";
 
 export default function HighVolumeMarkets() {
-  const { clobClient, eoaAddress } = useTrading();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
   const [selectedOutcome, setSelectedOutcome] = useState<{
     marketTitle: string;
     outcome: string;
@@ -21,24 +23,15 @@ export default function HighVolumeMarkets() {
     negRisk: boolean;
   } | null>(null);
 
-  const { data: markets, isLoading, error } = useHighVolumeMarkets(10);
+  const { tradingSession, isTradingSessionComplete, isGeoblocked } = useTrading();
 
-  if (isLoading) {
-    return <LoadingState message="Loading high volume markets..." />;
-  }
+  const { data: markets, isLoading, error } = useMarkets({
+    limit: 10,
+    categoryId: activeCategory,
+  });
 
-  if (error) {
-    return <ErrorState error={error} title="Error loading markets" />;
-  }
-
-  if (!markets || markets.length === 0) {
-    return (
-      <EmptyState
-        title="No Markets Available"
-        message="No active markets found."
-      />
-    );
-  }
+  const category = getCategoryById(activeCategory);
+  const categoryLabel = category?.label || "Markets";
 
   const handleOutcomeClick = (
     marketTitle: string,
@@ -56,28 +49,59 @@ export default function HighVolumeMarkets() {
     setSelectedOutcome(null);
   };
 
+  const handleCategoryChange = (categoryId: CategoryId) => {
+    setActiveCategory(categoryId);
+  };
+
   return (
     <>
       <div className="space-y-4">
+        {/* Category Tabs */}
+        <CategoryTabs
+          activeCategory={activeCategory}
+          onCategoryChange={handleCategoryChange}
+        />
+
+        {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold">
-            High Volume Markets ({markets.length})
+            {categoryLabel} Markets {markets ? `(${markets.length})` : ""}
           </h3>
-          <p className="text-xs text-gray-400">Sorted by 24h volume</p>
+          <p className="text-xs text-gray-400">Sorted by volume + liquidity</p>
         </div>
 
-        <div className="space-y-3">
-          {markets.map((market) => (
-            <MarketCard
-              key={market.id}
-              market={market}
-              onOutcomeClick={handleOutcomeClick}
-            />
-          ))}
-        </div>
+        {/* Loading State */}
+        {isLoading && <LoadingState message={`Loading ${categoryLabel.toLowerCase()} markets...`} />}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <ErrorState error={error} title="Error loading markets" />
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !error && (!markets || markets.length === 0) && (
+          <EmptyState
+            title="No Markets Available"
+            message={`No active ${categoryLabel.toLowerCase()} markets found.`}
+          />
+        )}
+
+        {/* Market Cards */}
+        {!isLoading && !error && markets && markets.length > 0 && (
+          <div className="space-y-3">
+            {markets.map((market) => (
+              <MarketCard
+                key={market.id}
+                market={market}
+                disabled={isGeoblocked}
+                onOutcomeClick={handleOutcomeClick}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Modal */}
+      {/* Order Placement Modal */}
       {selectedOutcome && (
         <OrderPlacementModal
           isOpen={isModalOpen}
@@ -87,8 +111,8 @@ export default function HighVolumeMarkets() {
           currentPrice={selectedOutcome.price}
           tokenId={selectedOutcome.tokenId}
           negRisk={selectedOutcome.negRisk}
-          clobClient={clobClient}
-          eoaAddress={eoaAddress}
+          tradingSession={tradingSession}
+          isTradingSessionComplete={isTradingSessionComplete}
         />
       )}
     </>

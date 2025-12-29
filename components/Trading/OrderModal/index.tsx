@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import useClobOrder from "@/hooks/useClobOrder";
 
 import Portal from "@/components/Portal";
@@ -10,11 +10,24 @@ import OrderTypeToggle from "@/components/Trading/OrderModal/OrderTypeToggle";
 
 import { cn } from "@/utils/classNames";
 import { SUCCESS_STYLES } from "@/constants/ui";
-import { convertCentsToPrice } from "@/utils/order";
 import { MIN_ORDER_SIZE } from "@/constants/validation";
-import { isValidSize, isValidPriceCents } from "@/utils/validation";
+import { isValidSize } from "@/utils/validation";
+import { TradingSession } from "@/utils/session";
 
-import type { ClobClient } from "@polymarket/clob-client";
+function getDecimalPlaces(tickSize: number): number {
+  if (tickSize >= 1) return 0;
+  const str = tickSize.toString();
+  const decimalPart = str.split(".")[1];
+  return decimalPart ? decimalPart.length : 0;
+}
+
+function isValidTickPrice(price: number, tickSize: number): boolean {
+  if (tickSize <= 0) return false;
+  const multiplier = Math.round(price / tickSize);
+  const expectedPrice = multiplier * tickSize;
+  // Allow small floating point tolerance
+  return Math.abs(price - expectedPrice) < 1e-10;
+}
 
 type OrderPlacementModalProps = {
   isOpen: boolean;
@@ -24,8 +37,8 @@ type OrderPlacementModalProps = {
   currentPrice: number;
   tokenId: string;
   negRisk?: boolean;
-  clobClient: ClobClient | null;
-  eoaAddress: string | undefined;
+  tradingSession: TradingSession | null;
+  isTradingSessionComplete: boolean | undefined;
 };
 
 export default function OrderPlacementModal({
@@ -36,23 +49,48 @@ export default function OrderPlacementModal({
   currentPrice,
   tokenId,
   negRisk = false,
-  clobClient,
-  eoaAddress,
+  tradingSession,
+  isTradingSessionComplete,
 }: OrderPlacementModalProps) {
   const [size, setSize] = useState<string>("");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState<string>("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [tickSize, setTickSize] = useState<number>(0.01);
+  const [isLoadingTickSize, setIsLoadingTickSize] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
+  const decimalPlaces = getDecimalPlaces(tickSize);
 
   const {
     submitOrder,
     isSubmitting,
     error: orderError,
     orderId,
-  } = useClobOrder(clobClient, eoaAddress);
+  } = useClobOrder(tradingSession, isTradingSessionComplete);
+
+  const fetchTickSize = useCallback(async () => {
+    if (!tokenId) return;
+    
+    setIsLoadingTickSize(true);
+    try {
+      const response = await fetch(`/api/polymarket/tick-size?tokenId=${encodeURIComponent(tokenId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        const parsedTickSize = typeof data.tickSize === 'string' 
+          ? parseFloat(data.tickSize) 
+          : data.tickSize;
+        if (parsedTickSize && !isNaN(parsedTickSize) && parsedTickSize > 0) {
+          setTickSize(parsedTickSize);
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to fetch tick size, using default:", error);
+    } finally {
+      setIsLoadingTickSize(false);
+    }
+  }, [tokenId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -61,8 +99,10 @@ export default function OrderPlacementModal({
       setLimitPrice("");
       setLocalError(null);
       setShowSuccess(false);
+      setTickSize(0.01);
+      fetchTickSize();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchTickSize]);
 
   useEffect(() => {
     if (orderId && isOpen) {
@@ -100,9 +140,7 @@ export default function OrderPlacementModal({
   if (!isOpen) return null;
 
   const sizeNum = parseFloat(size) || 0;
-  const limitPriceNum = limitPrice
-    ? convertCentsToPrice(parseInt(limitPrice))
-    : 0;
+  const limitPriceNum = parseFloat(limitPrice) || 0;
   const effectivePrice = orderType === "limit" ? limitPriceNum : currentPrice;
 
   const handlePlaceOrder = async () => {
@@ -112,15 +150,18 @@ export default function OrderPlacementModal({
     }
 
     if (orderType === "limit") {
-      if (!limitPrice) {
+      if (!limitPrice || limitPriceNum <= 0) {
         setLocalError("Limit price is required");
         return;
       }
 
-      const cents = parseInt(limitPrice);
+      if (limitPriceNum < tickSize || limitPriceNum > (1 - tickSize)) {
+        setLocalError(`Price must be between $${tickSize.toFixed(decimalPlaces)} and $${(1 - tickSize).toFixed(decimalPlaces)}`);
+        return;
+      }
 
-      if (!isValidPriceCents(cents)) {
-        setLocalError("Price must be between 1 and 99 (0.01 to 0.99)");
+      if (!isValidTickPrice(limitPriceNum, tickSize)) {
+        setLocalError(`Price must be a multiple of tick size ($${tickSize})`);
         return;
       }
     }
@@ -211,6 +252,9 @@ export default function OrderPlacementModal({
             orderType={orderType}
             currentPrice={currentPrice}
             isSubmitting={isSubmitting}
+            tickSize={tickSize}
+            decimalPlaces={decimalPlaces}
+            isLoadingTickSize={isLoadingTickSize}
           />
 
           {/* Order Summary */}
@@ -219,15 +263,15 @@ export default function OrderPlacementModal({
           {/* Place Order Button */}
           <button
             onClick={handlePlaceOrder}
-            disabled={isSubmitting || sizeNum <= 0 || !clobClient}
+            disabled={isSubmitting || sizeNum <= 0 || !isTradingSessionComplete}
             className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors"
           >
             {isSubmitting ? "Placing Order..." : "Place Order"}
           </button>
 
-          {!clobClient && (
+          {!isTradingSessionComplete && (
             <p className="text-xs text-yellow-400 mt-2 text-center">
-              Initialize CLOB client first
+              Initialize trading session first
             </p>
           )}
         </div>

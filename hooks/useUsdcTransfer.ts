@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { RelayClient } from "@polymarket/builder-relayer-client";
 import { createUsdcTransferTx, TransferParams } from "@/utils/transfers";
 
 export default function useUsdcTransfer() {
@@ -7,22 +6,28 @@ export default function useUsdcTransfer() {
   const [error, setError] = useState<Error | null>(null);
 
   const transferUsdc = useCallback(
-    async (
-      relayClient: RelayClient,
-      params: TransferParams
-    ): Promise<boolean> => {
+    async (params: TransferParams): Promise<boolean> => {
       setIsTransferring(true);
       setError(null);
 
       try {
         const transferTx = createUsdcTransferTx(params);
 
-        const response = await relayClient.execute(
-          [transferTx],
-          `Transfer USDC.e to ${params.recipient}`
-        );
+        const response = await fetch("/api/wallet/relay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transactions: [transferTx],
+            description: `Transfer USDC.e to ${params.recipient}`,
+          }),
+        });
 
-        await response.wait();
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to transfer USDC.e");
+        }
+
         return true;
       } catch (err) {
         const error =
